@@ -229,6 +229,7 @@ const HomePage: React.FC = () => {
                   <p><strong>School:</strong> {participant.nama_sekolah}</p>
                   <p><strong>Address:</strong> {participant.alamat}</p>
                   <p><strong>Email:</strong> {participant.email}</p>
+                  <p><strong>Phone:</strong> {participant.no_telepon || '-'}</p>
                   <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Nametag #{participant.no_nametag}
                   </div>
