@@ -18,6 +18,11 @@ const HomePage: React.FC = () => {
   const [representativeName, setRepresentativeName] = useState('');
   const [representativePhone, setRepresentativePhone] = useState('');
 
+  const formatDateTime = (date: string | null) => {
+    if (!date) return '-';
+    return format(new Date(date), 'dd/MM/yyyy HH:mm:ss');
+  };
+
   const handleAddRepresentative = async () => {
     if (!selectedParticipant || !representativeName || !representativePhone) {
       setError('Please fill in all required fields');
@@ -68,15 +73,13 @@ const HomePage: React.FC = () => {
 
   const handleParticipantUpdate = async (updated: Participant) => {
     try {
-      // Get current participant data
       const currentParticipant = searchResults.find(p => p.id === updated.id);
       if (!currentParticipant) {
         throw new Error('Participant not found in current results');
       }
 
-      // Prepare updates with timestamps
       const updates: Participant = {
-        ...currentParticipant, // Start with current data
+        ...currentParticipant,
         updated_at: new Date().toISOString(),
         check_in: currentParticipant.check_in ?? false,
         check_in_time: currentParticipant.check_in_time ?? null,
@@ -87,7 +90,6 @@ const HomePage: React.FC = () => {
         lunch_box_ticket_received_time: currentParticipant.lunch_box_ticket_received_time ?? null
       };
 
-      // Update specific fields based on what was changed
       if (updated.check_in !== undefined) {
         updates.check_in = updated.check_in;
         if (updated.check_in) {
@@ -108,12 +110,8 @@ const HomePage: React.FC = () => {
         }
       }
 
-      console.log('Final updates:', updates);
-
-      // Update database first
       const result = await updateParticipantStatus(updated.id, updates);
       
-      // Then update local state with the result from database
       setSearchResults((prev: Participant[]) => 
         prev.map((p: Participant) => p.id === updated.id ? result : p)
       );
@@ -125,7 +123,6 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Modal */}
       {showRepresentativeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-h-[90vh] overflow-y-auto">
@@ -296,24 +293,19 @@ const HomePage: React.FC = () => {
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Check In
+                      Check In: {participant.check_in ? formatDateTime(participant.check_in_time) : 'Not checked in'}
                     </div>
                     <div className={`flex items-center ${participant.snack_box_received ? 'text-green-600' : 'text-gray-500'}`}>
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Snack Box
+                      Snack Box: {participant.snack_box_received ? formatDateTime(participant.snack_box_time) : 'Not received'}
                     </div>
                     <div className={`flex items-center ${participant.lunch_box_ticket_received ? 'text-green-600' : 'text-gray-500'}`}>
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Lunch Box Ticket: {participant.lunch_box_ticket_received ? 'Received' : 'Not Received'}
-                      {participant.lunch_box_ticket_received && participant.lunch_box_ticket_received_time && (
-                        <span className="ml-2 text-sm text-gray-600">
-                          ({format(new Date(participant.lunch_box_ticket_received_time), 'PPp')})
-                        </span>
-                      )}
+                      Lunch Box Ticket: {participant.lunch_box_ticket_received ? formatDateTime(participant.lunch_box_ticket_received_time) : 'Not received'}
                     </div>
                   </div>
                 </div>
