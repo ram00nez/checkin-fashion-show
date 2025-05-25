@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Users, Coffee, Ticket, Clock } from 'lucide-react';
+import { Users, Coffee, Ticket, Clock, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getAdminStats, searchParticipants, getAllParticipants, updateParticipantStatus } from '../lib/supabase';
 import SearchInput from '../components/ui/SearchInput';
 import ParticipantCard from '../components/ParticipantCard';
 import type { Participant } from '../types';
+import Papa from 'papaparse';
 
 interface Stats {
   checkedIn: number;
@@ -58,18 +59,58 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user]);
 
+  const handleExportData = () => {
+    try {
+      // Transform data for CSV export
+      const exportData = participants.map(participant => ({
+        'Nama Anak': participant.nama_anak,
+        'Nama Orang Tua': participant.nama_orang_tua,
+        'Email': participant.email,
+        'Alamat': participant.alamat,
+        'Sekolah': participant.nama_sekolah,
+        'Jenis Kelamin': participant.jenis_kelamin,
+        'No. Nametag': participant.no_nametag,
+        'Status Check-in': participant.check_in ? 'Ya' : 'Tidak',
+        'Waktu Check-in': participant.check_in_time || '-',
+        'Snack Box': participant.snack_box_received ? 'Diterima' : 'Belum',
+        'Waktu Snack Box': participant.snack_box_time || '-',
+        'Tiket Makan Siang': participant.lunch_box_ticket_received ? 'Diterima' : 'Belum',
+        'Waktu Tiket Makan Siang': participant.lunch_box_ticket_received_time || '-',
+        'Nama Perwakilan': participant.representative_name || '-',
+        'No. Telepon Perwakilan': participant.representative_phone || '-'
+      }));
+
+      // Generate CSV
+      const csv = Papa.unparse(exportData);
+      
+      // Create blob and download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `peserta_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      setError('Gagal mengekspor data');
+    }
+  };
+
   const handleSearch = async (query: string) => {
     try {
       setLoading(true);
       if (query.trim() === '') {
-        // Jika query kosong, tampilkan semua peserta
         setFilteredParticipants(participants);
       } else {
-        // Jika ada query, lakukan pencarian
         const results = await searchParticipants(query);
         setFilteredParticipants(results);
       }
-      setSearchValue(query); // Update search value after search
+      setSearchValue(query);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while searching');
     } finally {
@@ -79,15 +120,13 @@ const AdminDashboard: React.FC = () => {
 
   const handleParticipantUpdate = async (updated: Partial<Participant>) => {
     try {
-      // Get current participant data
       const currentParticipant = filteredParticipants.find(p => p.id === updated.id);
       if (!currentParticipant || !updated.id) {
         throw new Error('Participant or ID not found');
       }
 
-      // Prepare updates with timestamps
       const updates: Participant = {
-        ...currentParticipant, // Start with current data
+        ...currentParticipant,
         updated_at: new Date().toISOString(),
         check_in: currentParticipant.check_in ?? false,
         check_in_time: currentParticipant.check_in_time ?? null,
@@ -98,7 +137,6 @@ const AdminDashboard: React.FC = () => {
         lunch_box_ticket_received_time: currentParticipant.lunch_box_ticket_received_time ?? null
       };
 
-      // Update specific fields based on what was changed
       if (updated.check_in !== undefined) {
         updates.check_in = updated.check_in;
         if (updated.check_in) {
@@ -119,15 +157,12 @@ const AdminDashboard: React.FC = () => {
         }
       }
 
-      // Update database first
       const result = await updateParticipantStatus(updated.id!, updates);
       
-      // Then update local state with the result from database
       setFilteredParticipants((prev: Participant[]) => 
         prev.map((p: Participant) => p.id === updated.id ? result : p)
       );
 
-      // Update stats
       const statsUpdates = {
         checkedIn: updated.check_in && !currentParticipant.check_in ? 1 : 0,
         notCheckedIn: !updated.check_in && currentParticipant.check_in ? 1 : 0,
@@ -135,7 +170,6 @@ const AdminDashboard: React.FC = () => {
         lunchDistributed: updated.lunch_box_ticket_received && !currentParticipant.lunch_box_ticket_received ? 1 : 0
       };
 
-      // Update stats
       setStats(prev => ({
         ...prev,
         checkedIn: prev.checkedIn + statsUpdates.checkedIn,
@@ -150,17 +184,16 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-
-
   const formatDateTime = (date: string | null | undefined) => {
     if (!date) return '-';
-    return new Date(date).toLocaleString('en-US', {
+    return new Date(date).toLocaleString('id-ID', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
+      timeZone: 'Asia/Jakarta'
     });
   };
 
@@ -177,6 +210,13 @@ const AdminDashboard: React.FC = () => {
             Monitor event activities and manage participant information.
           </p>
         </div>
+        <button
+          onClick={handleExportData}
+          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        >
+          <Download className="w-5 h-5 mr-2" />
+          Export Data
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -232,6 +272,7 @@ const AdminDashboard: React.FC = () => {
           className="w-full"
         />
       </div>
+
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         {loading && (
           <div className="flex justify-center items-center py-8">
